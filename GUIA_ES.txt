@@ -1,0 +1,59 @@
+ARCADE LEADERBOARD - GUIA DE LA PRACTICA
+
+1. QUE HACE EL PROYECTO
+Es un servicio web en Java: registra jugadores, guarda sus puntos y devuelve una clasificacion. No es un videojuego ni una pagina con botones. Se utiliza con peticiones HTTP, por ejemplo desde PowerShell, curl o Postman. Los datos estan en memoria: al apagar el servidor se pierden.
+
+2. EL FALLO Y LA CORRECCION (v1.0.1)
+El test original rejectsDuplicateNickname exigia que no se pudiera registrar dos veces Ada, pero create() guardaba cualquier apodo valido sin comprobar si ya existia.
+Ahora se consulta el repositorio antes de crear el jugador. Si ya existe el apodo, se lanza IllegalArgumentException; el adaptador la transforma en HTTP 400. Se compara el texto tras trim(), de modo que "Ada" y "  Ada  " son el mismo apodo. Se mantiene una comparacion sensible a mayusculas: Ada y ada son distintos.
+Se anadio rejectsDuplicateNicknameAfterTrimming: registra Ada, intenta repetirla con espacios, comprueba que solo queda el jugador original y que el siguiente ID sigue siendo 2. Es una prueba de regresion: impide que el fallo vuelva a aparecer.
+La creacion esta sincronizada para que dos peticiones simultaneas que usen el mismo caso de uso no registren el mismo apodo.
+Antes de empezar las funciones nuevas, se hizo un commit y se marco con v1.0.1. Esa etiqueta contiene solamente la correccion, su prueba y el numero de version del proyecto.
+
+3. SUMAR PUNTOS
+POST /api/players/{id}/scores recibe, por ejemplo, {"points":10}.
+RecordScoreRequest representa ese JSON. PlayerHttpAdapter lee el ID y el cuerpo y llama a addScore(). El caso de uso valida que points sea mayor que cero y busca al jugador. Si existe, crea un Player con el mismo ID y apodo, suma al total anterior y guarda el resultado. Player es un record inmutable: se reemplaza el registro en lugar de modificarlo.
+Devuelve HTTP 200 con el jugador actualizado; 404 si el jugador no existe y se envian puntos validos; 400 si los puntos son cero o negativos. Tambien se evita que un entero se desborde. addScore() esta sincronizado para no perder sumas simultaneas dentro de la instancia del servicio.
+Ejemplo: Ada tiene 0, recibe 10 y despues 5; termina con 15.
+
+4. CLASIFICACION
+GET /api/leaderboard devuelve todos los jugadores. GET /api/leaderboard?limit=2 devuelve los dos primeros.
+leaderboard() recoge los jugadores y usa un stream. comparingInt(Player::score).reversed() ordena de mayor a menor puntuacion. thenComparing(Player::nickname) desempata por orden natural de String, sensible a mayusculas. limit() se aplica despues de ordenar. toList() crea la lista resultante.
+Si no hay limite, devuelve todos. Si es cero, negativo, vacio, decimal, texto o un entero fuera de rango, responde 400. Si el limite es mayor que el numero de jugadores, devuelve los que haya. Tambien aparecen los jugadores con cero puntos.
+Ejemplo: Bob 15, Zoe 10 y Ada 10 producen Bob, Ada, Zoe.
+
+5. POR QUE SE RESPETA LA ARQUITECTURA
+Player es el dato del dominio. PlayerFactory valida los nuevos jugadores. PlayerRepository define como guardar y consultar y PlayerRepositoryImpl lo hace en memoria. PlayerUseCase declara las operaciones y PlayerUseCaseImpl contiene las reglas. PlayerHttpAdapter traduce entre HTTP y esas operaciones. Main conecta las piezas.
+Las reglas de puntos y ordenacion no dependen de Javalin. Asi se pueden probar directamente, sin servidor. Los tests HTTP arrancan ademas un servidor real en un puerto libre y comprueban las respuestas con HttpClient.
+
+6. GIT: TODO EN MAIN
+Se conservo el repositorio original y v1.0.0. No se crearon ramas nuevas.
+Secuencia: v1.0.0 -> commit de correccion (v1.0.1) -> commit de funciones, tests y documentacion (v1.1.0).
+Una etiqueta es un nombre fijo que apunta a un commit. v1.1.0 es anotada: ademas guarda mensaje y metadatos. La carpeta .git incluida en el ZIP es necesaria para conservar historial y etiquetas: no la borres.
+Comandos para comprobarlo:
+git branch
+git log --oneline --decorate
+git show v1.0.1:src/main/java/es/ulpgc/hpi/arcadeservice/architecture/usecases/PlayerUseCase.java
+git show v1.1.0 --no-patch
+git status
+El tercer comando permite comprobar que v1.0.1 aun no declara addScore ni leaderboard.
+
+7. COMO ABRIRLO Y EJECUTARLO EN WINDOWS
+Extrae todo el ZIP. Abre la carpeta arcade en IntelliJ o VS Code. Necesitas un JDK 17 o superior y Maven; no basta un entorno de ejecucion JRE. Comprueba java -version y mvn -version. En IntelliJ importa pom.xml como proyecto Maven y selecciona el JDK.
+En la terminal de la carpeta que contiene pom.xml:
+mvn clean test
+mvn compile exec:java
+El segundo comando deja el servidor encendido en http://localhost:7070. Deja esa terminal abierta. Ctrl+C lo detiene. Si el puerto esta ocupado, en PowerShell puedes usar $env:PORT="7071" antes de arrancar y cambiar el puerto en las peticiones.
+
+8. PROBAR DESDE OTRA VENTANA DE POWERSHELL
+$base = "http://localhost:7070"
+$ada = Invoke-RestMethod -Method Post -Uri "$base/api/players" -ContentType "application/json" -Body '{"nickname":"Ada"}'
+Invoke-RestMethod -Method Post -Uri "$base/api/players/$($ada.id)/scores" -ContentType "application/json" -Body '{"points":10}'
+Invoke-RestMethod -Method Post -Uri "$base/api/players/$($ada.id)/scores" -ContentType "application/json" -Body '{"points":5}'
+Invoke-RestMethod "$base/api/leaderboard?limit=2"
+Veras a Ada con 15 puntos. Usa el ID devuelto, no supongas que siempre sera 1. Para ver una clasificacion con mas jugadores, registra Bob o Zoe y sumales puntos.
+Abriendo http://localhost:7070/api/leaderboard en el navegador puedes consultar el JSON, pero la barra del navegador no sirve para enviar las operaciones POST.
+
+9. COMO EXPLICARLO EN CLASE
+"Primero revise el test que rechazaba apodos duplicados y vi que el caso de uso no hacia esa comprobacion. Anadi la validacion y un test de regresion con espacios. Guarde esa version como v1.0.1 antes de desarrollar las mejoras. Despues implemente una operacion que suma puntos al total y otra que ordena la clasificacion por puntos y por apodo en caso de empate. Mantuvimos todo en main. Finalmente comprobe la logica y las respuestas HTTP, actualice el README y marque la version completa con la etiqueta anotada v1.1.0."
+Usa esta explicacion para entender y describir el codigo; revisa los archivos y ejecuta los comandos antes de exponer.

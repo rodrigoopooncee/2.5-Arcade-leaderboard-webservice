@@ -37,4 +37,28 @@ public final class PlayerUseCaseImpl implements PlayerUseCase {
         repository.save(player);
         return player;
     }
+    @Override
+    public synchronized Optional<Player> addScore(long id, int points) {
+        if (points <= 0) throw new IllegalArgumentException("Points must be positive");
+        return repository.findById(id).map(player -> {
+            if (points > Integer.MAX_VALUE - player.score()) {
+                throw new IllegalArgumentException("Total score is too large");
+            }
+            var updated = new Player(player.id(), player.nickname(), player.score() + points);
+            repository.save(updated);
+            return updated;
+        });
+    }
+
+    @Override
+    public List<Player> leaderboard(Integer limit) {
+        if (limit != null && limit <= 0) {
+            throw new IllegalArgumentException("Limit must be positive");
+        }
+        return repository.findAll().stream()
+                .sorted(java.util.Comparator.comparingInt(Player::score).reversed()
+                        .thenComparing(Player::nickname))
+                .limit(limit == null ? Long.MAX_VALUE : limit)
+                .toList();
+    }
 }

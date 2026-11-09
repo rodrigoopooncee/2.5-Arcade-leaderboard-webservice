@@ -1,0 +1,20 @@
+VALIDACION REAL - 9 de noviembre de 2026
+Entorno: JDK 17 (Temurin), Maven 3.9.9.
+
+Antes del arreglo: 4 tests, 2 fallos (duplicado original y duplicado con espacios).
+Tras el arreglo v1.0.1: 4 tests, 0 fallos, 0 errores.
+Version final: 16 tests, 0 fallos, 0 errores, 0 omitidos. BUILD SUCCESS.
+  PlayerUseCaseTest: 4
+  ScoreAndLeaderboardTest: 8
+  PlayerHttpAdapterTest: 4
+
+Los tests HTTP arrancaron un servidor Javalin real en un puerto libre.
+Comprobaron /health, alta con Location, consulta, duplicados, acumulacion,
+clasificacion con desempate, limites y errores 400/404.
+
+Se conservo exclusivamente main. Se inspecciono PlayerUseCase en v1.0.1:
+no incluye addScore ni leaderboard. La version final conserva el test de regresion.
+
+Para repetir localmente: mvn clean test
+Los informes se generan en target/surefire-reports.
+Los informes de la ejecucion final estan tambien en evidencias/.

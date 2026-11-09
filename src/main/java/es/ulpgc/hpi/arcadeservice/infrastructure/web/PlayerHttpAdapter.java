@@ -27,6 +27,19 @@ public final class PlayerHttpAdapter {
                 ctx.header("Location", "/api/players/" + player.id());
                 ctx.json(player);
             });
+            config.routes.post("/api/players/{id}/scores", ctx -> {
+                long id = Long.parseLong(ctx.pathParam("id"));
+                var request = ctx.bodyAsClass(RecordScoreRequest.class);
+                ctx.json(players.addScore(id, request.points())
+                        .orElseThrow(() -> new NotFoundResponse("Player not found")));
+            });
+            config.routes.get("/api/leaderboard", ctx -> {
+                String rawLimit = ctx.queryParam("limit");
+                Integer limit = rawLimit == null ? null : Integer.valueOf(rawLimit);
+                ctx.json(players.leaderboard(limit));
+            });
+            config.routes.exception(com.fasterxml.jackson.core.JsonProcessingException.class, (error, ctx) ->
+                ctx.status(400).json(Map.of("error", "Invalid JSON body")));
             config.routes.exception(IllegalArgumentException.class, (error, ctx) ->
                 ctx.status(400).json(Map.of("error", error.getMessage())));
         });
