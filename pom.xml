@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>es.ulpgc.hpi</groupId>
     <artifactId>arcade-leaderboard-service</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <name>Arcade Leaderboard Service</name>
     <properties>
         <maven.compiler.release>17</maven.compiler.release>

@@ -24,6 +24,15 @@ class PlayerUseCaseTest {
     }
 
     @Test
+    void rejectsDuplicateNicknameAfterTrimming() {
+        var useCase = new PlayerUseCaseImpl(new PlayerRepositoryImpl());
+        var original = useCase.create("Ada");
+        assertThrows(IllegalArgumentException.class, () -> useCase.create("  Ada  "));
+        assertEquals(java.util.List.of(original), useCase.list());
+        assertEquals(2L, useCase.create("Bob").id());
+    }
+
+    @Test
     void rejectsDuplicateNickname() {
         var useCase = new PlayerUseCaseImpl(new PlayerRepositoryImpl());
         useCase.create("Ada");
